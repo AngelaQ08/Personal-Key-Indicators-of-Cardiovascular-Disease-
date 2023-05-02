@@ -1,0 +1,314 @@
+---
+title: "Logistic Regression"
+output: html_document
+date: "2023-04-26"
+---
+
+```{r setup, message=FALSE, echo=FALSE, warning=FALSE}
+library(knitr)
+
+opts_chunk$set(
+  warning = FALSE,
+  message = FALSE,
+  eval=TRUE,
+  echo = TRUE,
+  cache=FALSE,
+  include=TRUE,
+  fig.width = 10, 
+  fig.align = 'center',
+  fig.asp = 0.618,
+  out.width = "700px")
+```
+
+```{r}
+library(ggplot2)
+library(caret)
+library(caTools)
+library(tidyverse)
+```
+
+
+```{r}
+michd = read.csv("MICHD.csv")
+str(michd)
+```
+
+```{r}
+col_factor = c("Urban", "PhysicalActivity","Asthma","Arthritis","Sex","Race","Age",
+              "Education","Alcohol", "Smoke","HIV","Cholesterol", "Stroke", "MICHD")
+michd[col_factor] = lapply(michd[col_factor], factor)
+str(michd)
+```
+
+```{r}
+set.seed(123)
+idx = createDataPartition(michd$MICHD, times=1, p = 0.7, list = FALSE)
+
+michd$BMI <- scale(michd$BMI)
+michd$HHADULT <- scale(michd$HHADULT)
+michd$Fruit <- scale(michd$Fruit)
+michd$Vegetable <- scale(michd$Vegetable)
+
+train = michd[idx,]
+test = michd[-idx,]
+```
+
+
+```{r}
+model <- glm(MICHD ~ ., data = train, family = binomial())
+summary(model)
+```
+
+```{r}
+model_summary <- summary(model)
+coef_table <- data.frame(model_summary$coefficients)
+
+coef_table_sorted <- coef_table[order(-abs(coef_table[, "Estimate"])), ]
+coef_table_sorted$Feature <- rownames(coef_table_sorted)
+
+fea_imp <- data.frame(feature = coef_table_sorted$Feature, 
+                      estimate = coef_table_sorted$Estimate)
+fea_imp <- fea_imp[-1,]
+
+fea_imp %>% ggplot(aes(x = estimate, y = feature)) +
+  geom_bar(stat = "identity", fill = "steelblue") +
+  scale_y_discrete(limits = rev(fea_imp$feature)) + 
+  labs(x = "Features", y = "Coefficients") +
+  theme_minimal() 
+```
+
+```{r}
+library(pROC)
+pred_prob <- predict(model, newdata = test, type = "response")
+roc_obj <- roc(test$MICHD, pred_prob, plot = TRUE)
+max_auc <- max(roc_obj$auc) 
+max_auc
+best_thres <- roc_obj$thresholds[which.max(roc_obj$specificities+roc_obj$sensitivities)]
+best_thres
+pred <- ifelse(pred_prob > best_thres, 1, 0)
+confusion = table(test$MICHD, pred)
+confusion
+accuracy = (confusion[1,1] + confusion[2,2]) / sum(confusion)
+tpr = confusion[2,2] / sum(confusion[2,])
+fpr = confusion[1,2] / sum(confusion[1,])
+accuracy
+tpr
+fpr
+```
+
+```{r}
+model_reduced <- glm(MICHD ~ Age + PhysicalHealth + MentalHealth + PhysicalActivity + Asthma + Arthritis + Sex + BMI + Education + Smoke + Alcohol + HIV + Cholesterol + Stroke, data = train, family = binomial())
+summary(model_reduced)
+```
+
+```{r}
+model_summary <- summary(model_reduced)
+coef_table <- data.frame(model_summary$coefficients)
+
+coef_table_sorted <- coef_table[order(-abs(coef_table[, "Estimate"])), ]
+coef_table_sorted$Feature <- rownames(coef_table_sorted)
+
+fea_imp <- data.frame(feature = coef_table_sorted$Feature, 
+                      estimate = coef_table_sorted$Estimate)
+fea_imp <- fea_imp[-1,]
+
+fea_imp %>% ggplot(aes(x = estimate, y = feature)) +
+  geom_bar(stat = "identity", fill = "steelblue") +
+  scale_y_discrete(limits = rev(fea_imp$feature)) + 
+  labs(x = "Features", y = "Coefficients") +
+  theme_minimal() 
+```
+
+```{r}
+pred_prob <- predict(model_reduced, newdata = test, type = "response")
+roc_obj <- roc(test$MICHD, pred_prob, plot = TRUE)
+max_auc <- max(roc_obj$auc) 
+max_auc
+best_thres <- roc_obj$thresholds[which.max(roc_obj$specificities+roc_obj$sensitivities)]
+best_thres
+pred <- ifelse(pred_prob > best_thres, 1, 0)
+confusion = table(test$MICHD, pred)
+confusion
+accuracy = (confusion[1,1] + confusion[2,2]) / sum(confusion)
+tpr = confusion[2,2] / sum(confusion[2,])
+fpr = confusion[1,2] / sum(confusion[1,])
+accuracy
+tpr
+fpr
+```
+
+```{r}
+# Regularization
+library(glmnet)
+library(ROCR)
+x.train = model.matrix(MICHD ~ ., data=train)   
+y.train = train$MICHD
+x.test = model.matrix(MICHD ~ ., data=test) 
+y.test = test$MICHD
+```
+
+```{r}
+library(MASS)
+library(leaps)
+```
+
+```{r}
+# FORWARD
+x.train = model.matrix(MICHD ~ ., data=train)
+k = ncol(x.train) - 1  
+
+model_for <- regsubsets(MICHD ~ .,
+                          train,
+                          nvmax = k,
+                          method = "forward")
+summary(model_for)$outmat
+summary(model_for)$bic
+best_model <- which.min(summary(model_for)$bic)
+sort(coef(model_for, best_model), decreasing = TRUE)
+```
+
+```{r}
+model_reduce_forward <- glm(MICHD ~ PhysicalHealth + MentalHealth + PhysicalActivity + Asthma + Arthritis +
+                              Sex + Age + BMI + Education + Smoke + Alcohol + HIV + Cholesterol + Stroke, train, family = 'binomial')
+summary(model_reduce_forward)
+```
+
+```{r}
+pred_prob <- predict(model_reduce_forward, newdata = test, type = "response")
+roc_obj <- roc(test$MICHD, pred_prob, plot = TRUE)
+
+max_auc <- max(roc_obj$auc)
+max_auc
+best_thres <- roc_obj$thresholds[which.max(roc_obj$specificities+roc_obj$sensitivities)]
+best_thres
+pred <- ifelse(pred_prob > best_thres, 1, 0)
+confusion = table(test$MICHD, pred)
+confusion
+accuracy = (confusion[1,1] + confusion[2,2]) / sum(confusion)
+tpr = confusion[2,2] / sum(confusion[2,])
+fpr = confusion[1,2] / sum(confusion[1,])
+accuracy
+tpr
+fpr
+```
+
+```{r}
+# BACKWARD
+model_back <- regsubsets(MICHD ~ .,
+                          train,
+                          nvmax = k,
+                          method = "backward")
+summary(model_back)$outmat
+summary(model_back)$bic
+best_model <- which.min(summary(model_back)$bic)
+sort(coef(model_back, best_model), decreasing = TRUE)
+```
+
+```{r}
+model_reduce_backward <- glm(MICHD ~ PhysicalHealth + MentalHealth + PhysicalActivity + Asthma + Arthritis +
+                              Sex + Age + BMI + Education + Smoke + Alcohol + HIV + Cholesterol + Stroke, train, family = 'binomial')
+summary(model_reduce_backward)
+```
+
+```{r}
+pred_prob <- predict(model_reduce_backward, newdata = test, type = "response")
+roc_obj <- roc(test$MICHD, pred_prob, plot = TRUE)
+
+max_auc <- max(roc_obj$auc)
+max_auc
+best_thres <- roc_obj$thresholds[which.max(roc_obj$specificities+roc_obj$sensitivities)]
+best_thres
+pred <- ifelse(pred_prob > best_thres, 1, 0)
+confusion = table(test$MICHD, pred)
+confusion
+accuracy = (confusion[1,1] + confusion[2,2]) / sum(confusion)
+tpr = confusion[2,2] / sum(confusion[2,])
+fpr = confusion[1,2] / sum(confusion[1,])
+accuracy
+tpr
+fpr
+```
+
+```{r}
+# L1
+lasso.mod = cv.glmnet(x.train, 
+                      y.train,
+                      alpha=1,
+                      family="binomial")
+plot(lasso.mod)
+```
+
+```{r}
+set.seed(101)
+
+lambda.min <- lasso.mod$lambda.min
+lasso_best <- glmnet(x.train, 
+                     y.train, 
+                     alpha = 1, 
+                     family = "binomial", 
+                     lambda = lambda.min)
+
+coef_table <- coef(lasso_best)
+coef_table[order(-abs(coef_table[, "s0"])), ]
+```
+
+```{r}
+pred_prob <- predict(lasso_best, x.test, type = "response")
+roc_obj <- roc(y.test, pred_prob, plot = TRUE)
+max_auc <- max(roc_obj$auc)
+max_auc
+best_thres <- roc_obj$thresholds[which.max(roc_obj$specificities+roc_obj$sensitivities)]
+best_thres
+pred <- ifelse(pred_prob > best_thres, 1, 0)
+confusion = table(y.test, pred)
+confusion
+accuracy = (confusion[1,1] + confusion[2,2]) / sum(confusion)
+tpr = confusion[2,2] / sum(confusion[2,])
+fpr = confusion[1,2] / sum(confusion[1,])
+accuracy
+tpr
+fpr
+```
+
+
+```{r}
+# L2
+ridge.mod = cv.glmnet(x.train, 
+                   y.train,
+                   alpha=0,
+                   family="binomial")
+plot(ridge.mod)
+```
+
+```{r}
+set.seed(101)
+
+lambda.min <- ridge.mod$lambda.min
+ridge_best <- glmnet(x.train, 
+                     y.train, 
+                     alpha = 0, 
+                     family = "binomial", 
+                     lambda = lambda.min)
+
+
+coef_table_2 <- coef(ridge_best)
+coef_table_2[order(-abs(coef_table_2[, "s0"])), ]
+```
+
+```{r}
+pred_prob <- predict(ridge_best, x.test, type = "response")
+roc_obj <- roc(y.test, pred_prob, plot = TRUE)
+max_auc <- max(roc_obj$auc)
+max_auc
+best_thres <- roc_obj$thresholds[which.max(roc_obj$specificities+roc_obj$sensitivities)]
+best_thres
+pred <- ifelse(pred_prob > best_thres, 1, 0)
+confusion = table(y.test, pred)
+confusion
+accuracy = (confusion[1,1] + confusion[2,2]) / sum(confusion)
+tpr = confusion[2,2] / sum(confusion[2,])
+fpr = confusion[1,2] / sum(confusion[1,])
+accuracy
+tpr
+fpr
+```

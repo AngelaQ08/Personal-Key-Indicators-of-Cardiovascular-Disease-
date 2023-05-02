@@ -1,0 +1,229 @@
+---
+title: "EDA"
+output: html_document
+date: "2023-04-26"
+---
+
+```{r setup, message=FALSE, echo=FALSE, warning=FALSE}
+library(knitr)
+
+opts_chunk$set(
+  warning = FALSE,
+  message = FALSE,
+  eval=TRUE,
+  echo = TRUE,
+  cache=FALSE,
+  include=TRUE,
+  fig.width = 10, 
+  fig.align = 'center',
+  fig.asp = 0.618,
+  out.width = "700px")
+```
+
+```{r}
+library(ggplot2)
+library(reshape2)
+library(dplyr)
+library(tidyverse)
+```
+
+## Variable
+- `Urban`: Urban/Rural Status (1 if Urban counties, 0 if Rural counties)
+- `PhysicalHealth`: Number of days that participant's physical health is not good in the past 30 days
+- `MentalHealth`: Number of days that participant mental health is not good in the past 30 days
+- `PhysicalActivity`: participant who reported doing exercise in the past 30 days (1 if did, 0 if didn't)
+- `Asthma`: Whether participants experienced asthma (1 if current, 2 if former, 3 if never)
+- `Arthritis`: Whether participants diagnosed with some form of arthritis (1 if diagnosed, 0 if not diagnosed)
+- `Sex`: (1 if male, 0 if female)
+- `Race`: (1 if White, 2 if Black, 3 if American Indian or Alaskan Native, 4 if Asian, 5 if Native Hawaiian or other Pacific Islander only, 6 if other race, 7 if Multiracial, 8 if Hispanic)
+- `Age`: (1 if Age 18-24, 2 if Age 25-34, 3 if Age 35-44, 4 if Age 45-54, 5 if Age 55-64, 6 if Age 65+)
+- `BMI`: Calculated BMI based on Height and Weight. 
+- `Education`: Level of education (1 if didn't graduate high school, 2 if graduated high school, 3 if attended college or technical school, 4 if graduated from college or technical school)
+- `Smoke`: Levels of smoking (1 if smokes everyday, 2 if smokes some days, 3 if former smoker, 4 is never smoked)
+- `Alcohol`: Number of alcoholic beverages consumed per week.
+- `HHADULT`: Number of members in household
+- `HIV`: Participants tested for HIV (1 if Yes, 0 if No)
+- `Fruit`: Total fruits consumed per day
+- `Vegetable`: Total vegetables consumed per day
+- `Cholesterol`: Cholesterol is high (1 if Yes, 0 if No)
+- `Stroke`: Had a stroke (1 if Yes, 0 if No)
+- `MICHD`: Participants have reported having myocardial infarction(MI) or coronary heart disease(CHD) (1 if having, 0 if not having)
+
+**Dependent variable**: `MICHD`
+
+**Independent variables**: all other 
+
+# Data Prep
+```{r}
+michd = read.csv("MICHD.csv")
+str(michd)
+```
+```{r}
+col_factor = c("Urban", "PhysicalActivity","Asthma","Arthritis","Sex","Race","Age",
+              "Education","Alcohol", "Smoke","HIV","Cholesterol", "Stroke", "MICHD")
+michd[col_factor] = lapply(michd[col_factor], factor)
+str(michd)
+```
+
+```{r}
+# Density Plot
+michd.num <- michd %>% select(c("PhysicalHealth", "MentalHealth", "BMI", "HHADULT", "Fruit", "Vegetable", "MICHD"))
+
+ggplot(melt(michd.num), aes(x = value, fill = MICHD)) +
+  geom_density(alpha = 0.5) +
+  facet_wrap( ~ variable, scale = "free")
+```
+
+
+```{r}
+# Conditional density plots
+a <- michd %>%
+  ggplot() +
+  geom_histogram(aes(x=PhysicalHealth,
+                     fill=(MICHD==1)),
+                 position='fill') +  
+  theme_bw() +
+  xlab('Number of Days Physical Health Not Good in past 30 Days') +
+  ylab('Frequency') +
+  theme(axis.title=element_text(size=14), 
+        axis.text=element_text(size=14), 
+        legend.text=element_text(size=14)) +
+  scale_fill_manual(name='', 
+                    labels=c('No MICHD', 'Had MICHD'), 
+                    values=c('grey', 'red'))
+
+b <- michd %>%
+  ggplot() +
+  geom_histogram(aes(x=MentalHealth,
+                     fill=(MICHD==1)),
+                 position='fill') +  
+  theme_bw() +
+  xlab('Number of Days Mental Health Not Good in past 30 Days') +
+  ylab('Frequency') +
+  theme(axis.title=element_text(size=14), 
+        axis.text=element_text(size=14), 
+        legend.text=element_text(size=14)) +
+  scale_fill_manual(name='', 
+                    labels=c('No MICHD', 'Had MICHD'), 
+                    values=c('grey', 'red'))
+
+c <- michd %>%
+  ggplot() +
+  geom_histogram(aes(x=BMI,
+                     fill=(MICHD==1)),
+                 position='fill') +  
+  theme_bw() +
+  xlab('BMI') +
+  ylab('Frequency') +
+  theme(axis.title=element_text(size=14), 
+        axis.text=element_text(size=14), 
+        legend.text=element_text(size=14)) +
+  scale_fill_manual(name='', 
+                    labels=c('No MICHD', 'Had MICHD'), 
+                    values=c('grey', 'red'))
+
+
+
+d <- michd %>%
+  ggplot() +
+  geom_histogram(aes(x=HHADULT,
+                     fill=(MICHD==1)),
+                 position='fill') +  
+  theme_bw() +
+  xlab('HHADULT') +
+  ylab('Frequency') +
+  theme(axis.title=element_text(size=14), 
+        axis.text=element_text(size=14), 
+        legend.text=element_text(size=14)) +
+  scale_fill_manual(name='', 
+                    labels=c('No MICHD', 'Had MICHD'), 
+                    values=c('grey', 'red'))
+
+
+e <- michd %>%
+  ggplot() +
+  geom_histogram(aes(x=Fruit,
+                     fill=(MICHD==1)),
+                 position='fill') +  
+  theme_bw() +
+  xlab('Total fruits consumed per day') +
+  ylab('Frequency') +
+  theme(axis.title=element_text(size=14), 
+        axis.text=element_text(size=14), 
+        legend.text=element_text(size=14)) +
+  scale_fill_manual(name='', 
+                    labels=c('No MICHD', 'Had MICHD'), 
+                    values=c('grey', 'red'))
+
+f <- michd %>%
+  ggplot() +
+  geom_histogram(aes(x=Vegetable,
+                     fill=(MICHD==1)),
+                 position='fill') +  
+  theme_bw() +
+  xlab('Total Vegatables consumed per day') +
+  ylab('Frequency') +
+  theme(axis.title=element_text(size=14), 
+        axis.text=element_text(size=14), 
+        legend.text=element_text(size=14)) +
+  scale_fill_manual(name='', 
+                    labels=c('No MICHD', 'Had MICHD'), 
+                    values=c('grey', 'red'))
+
+
+library(gridExtra)
+grid.arrange(a,b,c,d,e,f, ncol = 2, nrow = 3)
+```
+
+# Correlation Plot
+```{r}
+# Select numeric variables
+michd.cor = michd  %>% select(c("PhysicalHealth", "MentalHealth", 
+                              "BMI", "HHADULT", "Fruit", "Vegetable"))
+
+michd.cor$Age.rank <- rank(michd$Age)
+michd.cor$Education.rank <- rank(michd$Education)
+michd.cor$Smoke.rank <- rank(michd$Smoke)
+
+c = cor(michd.cor, method = "spearman")
+
+library(corrplot)
+corrplot(c, addCoef.col = "red", tl.cex = 0.8)
+```
+
+# Clustering
+```{r}
+set.seed(123)
+michd_matrix_c <- model.matrix(~ . - 1, data = michd[, colnames(michd)])
+
+michd_matrix_c[,'BMI'] <- scale(michd_matrix_c[,'BMI'])
+michd_matrix_c[,'HHADULT'] <- scale(michd_matrix_c[,'HHADULT'])
+michd_matrix_c[,'Fruit'] <- scale(michd_matrix_c[,'Fruit'])
+michd_matrix_c[,'Vegetable'] <- scale(michd_matrix_c[,'Vegetable'])
+```
+
+```{r}
+set.seed(123)
+twcv = function(k) kmeans(michd_matrix_c, k, nstart = 25)$tot.withinss
+k <- 1:15
+twcv_values <- sapply(k, twcv)
+plot(twcv_values, type = 'b', pch = 19)
+```
+
+```{r}
+library(factoextra)
+k6 <- kmeans(michd_matrix_c, centers = 6, nstart = 25)
+fviz_cluster(k6, geom = "point", data = michd_matrix_c)
+
+k8 <- kmeans(michd_matrix_c, centers = 8, nstart = 25)
+fviz_cluster(k8, geom = "point", data = michd_matrix_c)
+
+k2 <- kmeans(michd_matrix_c, centers = 2, nstart = 25)
+fviz_cluster(k2, geom = "point", data = michd_matrix_c)
+```
+
+# PCA
+```{r}
+pca = prcomp(michd_matrix_c)
+fviz_pca_biplot(pca,repel = TRUE, col.var = "red", col.ind = "white", label = c("var"))
+```

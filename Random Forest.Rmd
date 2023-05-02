@@ -1,0 +1,193 @@
+---
+title: "Random Forest"
+output: html_document
+date: "2023-04-26"
+---
+
+```{r setup, message=FALSE, echo=FALSE, warning=FALSE}
+library(knitr)
+
+opts_chunk$set(
+  warning = FALSE,
+  message = FALSE,
+  eval=TRUE,
+  echo = TRUE,
+  cache=FALSE,
+  include=TRUE,
+  fig.width = 10, 
+  fig.align = 'center',
+  fig.asp = 0.618,
+  out.width = "700px")
+```
+
+```{r}
+library(ggplot2)
+library(reshape2)
+library(dplyr)
+library(caret)
+library(caTools)
+library(tidyverse)
+library(rpart)
+library(rpart.plot)
+library(pROC)
+```
+
+```{r}
+michd = read.csv("MICHD.csv")
+str(michd)
+```
+
+```{r}
+col_factor = c("Urban", "PhysicalActivity","Asthma","Arthritis","Sex","Race","Age",
+              "Education","Alcohol", "Smoke","HIV","Cholesterol", "Stroke", "MICHD")
+michd[col_factor] = lapply(michd[col_factor], factor)
+str(michd)
+```
+
+```{r}
+set.seed(123)
+subsample = createDataPartition(michd$MICHD, times=1, p = 0.1, list = FALSE)
+michd_sub = michd[subsample, ]
+```
+
+```{r}
+set.seed(123)
+idx = createDataPartition(michd_sub$MICHD, times=1, p = 0.7, list = FALSE)
+michd_sub$BMI <- scale(michd_sub$BMI)
+michd_sub$HHADULT <- scale(michd_sub$HHADULT)
+michd_sub$Fruit <- scale(michd_sub$Fruit)
+michd_sub$Vegetable <- scale(michd_sub$Vegetable)
+
+train_rf = michd_sub[idx,]
+test_rf = michd_sub[-idx,]
+```
+
+
+```{r}
+library(randomForest)
+start_time = Sys.time()
+
+rf.mod = randomForest(MICHD ~ ., data=michd_sub2)
+
+end_time = Sys.time()
+end_time - start_time
+```
+
+```{r}
+pred.rfFINAL = predict(rf.mod, newdata=michd_sub_test)
+
+confusion.matrix = table(michd_sub_test$MICHD, pred.rfFINAL)
+confusion.matrix
+
+accuracy = (confusion.matrix[1,1] + confusion.matrix[2,2]) / sum(confusion.matrix)
+accuracy
+
+tpr = confusion.matrix[2,2] / sum(confusion.matrix[2,])
+tpr
+
+fpr = confusion.matrix[1,2] / sum(confusion.matrix[1,])
+fpr
+```
+
+```{r}
+pred_prob <- predict(rf.mod, newdata = michd_sub_test, type = "prob")
+roc_obj <- roc(michd_sub_test$MICHD, pred_prob[, 2], plot = TRUE)
+test_auc <- roc_obj$auc
+test_auc
+```
+
+```{r}
+importance.rf = data.frame(imp=importance(rf.mod))
+feature = rownames(importance.rf)
+
+importance.rf %>% 
+  ggplot(aes(x = feature, y=MeanDecreaseGini)) + 
+  geom_bar(stat="identity", position=position_dodge())+
+  theme(axis.title=element_text(size=12), 
+        axis.text=element_text(size=7), 
+        legend.text=element_text(size=12))
+```
+
+
+```{r}
+set.seed(123)
+start_time = Sys.time()
+train.rf.oob = train(x = train_rf %>% dplyr::select(-MICHD),
+                      y = train_rf$MICHD,
+                      method="rf",
+                      tuneGrid=data.frame(mtry=1:20), 
+                      trControl=trainControl(method="oob"))  
+
+
+end_time = Sys.time()
+end_time - start_time
+```
+
+```{r}
+train.rf.oob$results %>%
+  ggplot(aes(x=mtry, 
+             y=Accuracy)) +
+  geom_point(size=5) +
+  theme_bw() +
+  labs(x="Number of variables per split",
+       y="Accuracy") +
+  scale_x_continuous(breaks=1:20) 
+```
+
+```{r}
+table(train_rf$MICHD)
+```
+
+```{r}
+best.mtry = train.rf.oob$bestTune[[1]]
+best.mtry
+
+subsample = createDataPartition(michd$MICHD, times=1, p = 0.7, list = FALSE)
+michd_sub2 = michd[subsample, ]
+michd_sub_test = michd[-subsample,]
+
+set.seed(123)
+mod.rfFINAL = randomForest(MICHD ~ ., 
+                           data=michd_sub2, 
+                           weight = ifelse(michd_sub2$MICHD == 0, 1/120265, 1/9149),
+                           mtry=best.mtry)
+```
+
+
+```{r}
+pred.rfFINAL = predict(mod.rfFINAL, newdata=michd_sub_test)
+
+confusion.matrix = table(michd_sub_test$MICHD, pred.rfFINAL)
+confusion.matrix
+
+accuracy = (confusion.matrix[1,1] + confusion.matrix[2,2]) / sum(confusion.matrix)
+accuracy
+
+tpr = confusion.matrix[2,2] / sum(confusion.matrix[2,])
+tpr
+
+fpr = confusion.matrix[1,2] / sum(confusion.matrix[1,])
+fpr
+
+```
+
+```{r}
+pred_prob <- predict(mod.rfFINAL, newdata = michd_sub_test, type = "prob")
+roc_obj <- roc(michd_sub_test$MICHD, pred_prob[, 2], plot = TRUE)
+test_auc <- roc_obj$auc
+test_auc
+```
+
+```{r}
+importance.rf = data.frame(imp=importance(mod.rfFINAL))
+feature = rownames(importance.rf)
+
+importance.rf %>% 
+  ggplot(aes(x = feature, y=MeanDecreaseGini)) + 
+  geom_bar(stat="identity", position=position_dodge())+
+  theme(axis.title=element_text(size=12), 
+        axis.text=element_text(size=7), 
+        legend.text=element_text(size=12))
+  
+```
+

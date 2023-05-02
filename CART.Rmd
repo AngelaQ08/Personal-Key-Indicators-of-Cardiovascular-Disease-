@@ -1,0 +1,121 @@
+---
+title: "CART"
+output: html_document
+date: "2023-04-27"
+---
+
+```{r setup, message=FALSE, echo=FALSE, warning=FALSE}
+library(knitr)
+
+opts_chunk$set(
+  warning = FALSE,
+  message = FALSE,
+  eval=TRUE,
+  echo = TRUE,
+  cache=FALSE,
+  include=TRUE,
+  fig.width = 10, 
+  fig.align = 'center',
+  fig.asp = 0.618,
+  out.width = "700px")
+```
+
+```{r}
+library(ggplot2)
+library(reshape2)
+library(dplyr)
+library(caret)
+library(caTools)
+library(tidyverse)
+library(rpart)
+library(rpart.plot)
+```
+
+```{r}
+michd = read.csv("MICHD.csv")
+str(michd)
+```
+
+```{r}
+col_factor = c("Urban", "PhysicalActivity","Asthma","Arthritis","Sex","Race","Age",
+              "Education","Alcohol", "Smoke","HIV","Cholesterol", "Stroke", "MICHD")
+michd[col_factor] = lapply(michd[col_factor], factor)
+str(michd)
+```
+
+```{r}
+set.seed(123)
+idx = createDataPartition(michd$MICHD, times=1, p = 0.7, list = FALSE)
+
+michd$BMI <- scale(michd$BMI)
+michd$HHADULT <- scale(michd$HHADULT)
+michd$Fruit <- scale(michd$Fruit)
+michd$Vegetable <- scale(michd$Vegetable)
+
+train = michd[idx,]
+test = michd[-idx,]
+```
+
+```{r}
+table(train$MICHD)
+loss.matrix = cbind(c(0, 1/9149), c(1/120265, 0))
+cpVals = data.frame(.cp = seq(0, .04, by=.0001))
+
+Loss <- function(data, lev = NULL, model = NULL, ...) {        
+  c(AvgLoss = mean(data$weights * (data$obs != data$pred)),
+    Accuracy = mean(data$obs == data$pred))                    
+}
+```
+
+```{r}
+set.seed(123)
+cpCV = train(MICHD ~ .,
+             data=train, 
+             method="rpart",
+             weights = ifelse(train$MICHD == 0, 1/120265, 1/9149),    
+             trControl=trainControl(method="cv",
+                                    number=10,
+                                    summaryFunction=Loss),
+             tuneGrid=cpVals, 
+             metric='AvgLoss', 
+             maximize=FALSE)
+```
+
+
+````{r}
+best.cp = cpCV$results$cp[which.min(cpCV$results$AvgLoss)]
+best.cp
+best.minbucket = cpCV$finalModel$control$minbucket
+best.minbucket
+```
+
+```{r}
+mod = rpart(MICHD ~ .,
+            data = train, 
+            method="class", 
+            parms=list(loss=loss.matrix),
+            minbucket=best.minbucket, 
+            cp=best.cp)
+
+rpart.plot(mod, type = 5, tweak = 1.4, extra = 104)
+```
+
+```{r}
+pred = predict(mod,newdata=test,type="class")
+confusion.matrix = table(test$MICHD, pred)
+confusion.matrix
+accuracy = (confusion.matrix[1,1] + confusion.matrix[2,2]) / sum(confusion.matrix)
+accuracy
+tpr = confusion.matrix[2,2] / sum(confusion.matrix[2,])
+tpr
+fpr = confusion.matrix[1,2] / sum(confusion.matrix[1,])
+fpr
+```
+
+```{r}
+library(pROC)
+pred_prob <- predict(mod, newdata = test, type = "prob")
+roc_obj <- roc(test$MICHD, pred_prob[, 2], plot = TRUE)
+test_auc <- roc_obj$auc
+test_auc
+```

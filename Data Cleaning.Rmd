@@ -1,0 +1,239 @@
+---
+title: "Data Prep"
+output: html_document
+date: "`r Sys.Date()`"
+---
+
+```{r setup, message=FALSE, echo=FALSE, warning=FALSE}
+library(knitr)
+
+opts_chunk$set(
+  warning = FALSE,
+  message = FALSE,
+  eval=TRUE,
+  echo = TRUE,
+  cache=FALSE,
+  include=TRUE,
+  fig.width = 10, 
+  fig.align = 'center',
+  fig.asp = 0.618,
+  out.width = "700px")
+```
+
+```{r}
+data = read.csv("data.csv")
+head(data)
+```
+
+```{r}
+library(dplyr)
+columns = c("X_URBSTAT", "PHYSHLTH", "MENTHLTH", "X_TOTINDA", "X_ASTHMS1", "X_DRDXAR3", 
+            "X_SEX", "X_RACE", "X_AGE_G", "X_BMI5", "X_EDUCAG", "X_SMOKER3", "X_RFDRHV7", 'HHADULT',
+            "X_AIDTST4", "X_FRUTSU1", "X_VEGESU1","TOLDHI3", "CVDSTRK3", 
+            "X_MICHD")
+data <- data %>% select(all_of(columns))
+dim(data)
+head(data)
+```
+
+```{r}
+colnames(data) = c('Urban', 'PhysicalHealth','MentalHealth','PhysicalActivity','Asthma',
+                   'Arthritis',"Sex",'Race',"Age","BMI",
+                   "Education","Smoke","Alcohol", "HHADULT", "HIV",
+                   "Fruit", "Vegetable", "Cholesterol","Stroke", 
+                   "MICHD")
+head(data)
+```
+
+```{r}
+data = na.omit(data)
+dim(data)
+```
+
+```{r}
+# Clean Urban
+table(data$Urban)
+data$Urban = replace(data$Urban, data$Urban == 2, 0)
+table(data$Urban)
+```
+
+```{r}
+# Clean PhysicalHealth
+table(data$PhysicalHealth)
+data = data[!(data$PhysicalHealth == 77 | data$PhysicalHealth == 99),]
+data$PhysicalHealth = replace(data$PhysicalHealth, data$PhysicalHealth == 88, 0)
+table(data$PhysicalHealth)
+```
+
+
+```{r}
+# Clean MentalHealth
+table(data$MentalHealth)
+data = data[!(data$MentalHealth == 77 | data$MentalHealth == 99),]
+data$MentalHealth = replace(data$MentalHealth, data$MentalHealth == 88,0)
+hist(data$MentalHealth)
+```
+
+```{r}
+# Clean PhysicalActivity
+table(data$PhysicalActivity)
+data = data[!(data$PhysicalActivity == 9),]
+data$PhysicalActivity = replace(data$PhysicalActivity, data$PhysicalActivity == 2, 0)
+table(data$PhysicalActivity)
+```
+
+```{r}
+# Clean Asthma
+table(data$Asthma)
+data = data[!(data$Asthma == 9),]
+```
+
+```{r}
+# Clean Arthritis
+table(data$Arthritis)
+data$Arthritis = replace(data$Arthritis, data$Arthritis == 2, 0)
+table(data$Arthritis)
+```
+
+```{r}
+# Clean Sex
+table(data$Sex)
+data$Sex = replace(data$Sex, data$Sex == 2, 0)
+table(data$Sex)
+```
+
+```{r}
+# Clean Race
+table(data$Race)
+data = data[!(data$Race == 9),]
+table(data$Race)
+```
+
+```{r}
+# Clean BMI
+summary(data$BMI)
+data$BMI = data$BMI / 100
+summary(data$BMI)
+```
+
+
+```{r}
+# Clean Education
+table(data$Education)
+data = data[!(data$Education == 9),]
+table(data$Education)
+```
+
+```{r}
+# Clean Smoke
+table(data$Smoke)
+data = data[!(data$Smoke == 9),]
+table(data$Smoke)
+```
+
+```{r}
+# Clean Alcohol
+summary(data$Alcohol)
+data = data[!(data$Alcohol == 9),]
+data$Alcohol = replace(data$Alcohol, data$Alcohol == 1, 0)
+data$Alcohol = replace(data$Alcohol, data$Alcohol == 2, 1)
+summary(data$Alcohol)
+```
+
+```{r}
+table(data$HHADULT)
+data = data[!(data$HHADULT == 99),]
+data = data[!(data$HHADULT == 77),]
+```
+
+
+```{r}
+# Clean Fruit
+summary(data$Fruit)
+data$Fruit = data$Fruit / 100
+summary(data$Fruit)
+```
+
+
+```{r}
+# Clean Vegetable
+summary(data$Vegetable)
+data$Vegetable = data$Vegetable / 100
+summary(data$Vegetable)
+```
+
+```{r}
+# Clean HIV
+table(data$HIV)
+data = data[!(data$HIV == 9),]
+data$HIV = replace(data$HIV,data$HIV == 2, 0)
+table(data$HIV)
+```
+
+```{r}
+# Clean Cholesterol
+table(data$Cholesterol)
+data = data[!(data$Cholesterol == 7),]
+data = data[!(data$Cholesterol == 9),]
+data$Cholesterol = replace(data$Cholesterol, data$Cholesterol == 2, 0)
+table(data$Cholesterol)
+```
+
+```{r}
+# Clean Stroke
+table(data$Stroke)
+data = data[!(data$Stroke == 7),]
+data = data[!(data$Stroke == 9),]
+data$Stroke = replace(data$Stroke, data$Stroke == 2, 0)
+table(data$Stroke)
+```
+
+```{r}
+# Clean MICHD
+table(data$MICHD)
+data$MICHD = replace(data$MICHD, data$MICHD == 2, 0)
+table(data$MICHD)
+```
+
+```{r}
+col_factor = c("Urban", "PhysicalActivity","Asthma","Arthritis","Sex","Race","Age",
+              "Education","Alcohol", "Smoke","HIV","Cholesterol", "Stroke", "MICHD")
+data[col_factor] = lapply(data[col_factor], factor)
+str(data)
+```
+
+```{r}
+library(ggplot2)
+library(reshape2)
+data.num <- data %>% select(c("PhysicalHealth", "MentalHealth", "BMI", "HHADULT", "Fruit", "Vegetable"))
+
+ggplot(melt(data.num), aes(x = value, fill = variable)) +
+  geom_histogram(alpha = 0.5, position = "identity", bins = 10) +
+  facet_wrap(~ variable, scales = "free") +
+  labs(x = "Values", y = "Frequency", title = "Histograms for Num Variables")
+```
+
+
+```{r}
+# Log Transformation
+data$PhysicalHealth = log(data$PhysicalHealth + 1)
+data$MentalHealth = log(data$MentalHealth + 1)
+data$HHADULT <- log(data$HHADULT)
+data$Fruit <- log(data$Fruit + 1)
+data$Vegetable <- log(data$Vegetable + 1)
+```
+
+```{r}
+data.num.log <- data %>% select(c("PhysicalHealth", "MentalHealth", "BMI", "HHADULT", "Fruit", "Vegetable"))
+
+ggplot(melt(data.num.log), aes(x = value, fill = variable)) +
+  geom_histogram(alpha = 0.5, position = "identity", bins = 10) +
+  facet_wrap(~ variable, scales = "free") +
+  labs(x = "Values", y = "Frequency", title = "Histograms for Num Variables")
+```
+
+
+```{r}
+#write.csv(data, "MICHD.csv", row.names = FALSE)
+```
+
